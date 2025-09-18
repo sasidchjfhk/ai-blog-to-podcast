@@ -1,0 +1,16 @@
+agno==1.2.8
+streamlit==1.44.1
+openai
+Requests
+firecrawl-py
+elevenlabs
+python-dotenv>=1.0.0
+
+
+
+echo "# ai-blog-to-podcast" >> README.md
+git init
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/sasidchjfhk/ai-blog-to-podcast.git
+git push -u origin main
