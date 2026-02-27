@@ -1,0 +1,59 @@
+name: archon-managed
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number'
+        required: true
+      comment_id:
+        description: 'Comment ID'
+        required: false
+      model:
+        description: 'AI Model'
+        required: true
+      archon_token:
+        description: 'SaaS Token'
+        required: false
+      groq_api_key:
+        description: 'Groq API Key for AI model access'
+        required: false
+
+jobs:
+  archon:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Archon Agent
+        uses: vediyappanm/pro-gitops/github@main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ARCHON_SaaS_TOKEN: ${{ github.event.inputs.archon_token }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+          COMMENT_ID: ${{ github.event.inputs.comment_id }}
+          GROQ_API_KEY: ${{ github.event.inputs.groq_api_key }}
+        with:
+          model: ${{ github.event.inputs.model }}
+
+      - name: Self Cleanup
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Deleting archon-managed.yml via GitHub API..."
+          FILE_PATH=".github/workflows/archon-managed.yml"
+          SHA=$(curl -s             -H "Authorization: token ${GH_TOKEN}"             -H "Accept: application/vnd.github+json"             "https://api.github.com/repos/${REPO}/contents/${FILE_PATH}" |             python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null || echo "")
+          if [ -n "${SHA}" ]; then
+            curl -s -X DELETE               -H "Authorization: token ${GH_TOKEN}"               -H "Accept: application/vnd.github+json"               -H "Content-Type: application/json"               "https://api.github.com/repos/${REPO}/contents/${FILE_PATH}"               -d "{"message":"chore: cleanup archon managed workflow [skip ci]","sha":"${SHA}"}"               | python3 -c "import sys,json; d=json.load(sys.stdin); print('Deleted:', d.get('commit',{}).get('sha','unknown'))"               || echo "Warning: API delete failed, will retry on next run"
+            echo "Cleanup complete."
+          else
+            echo "File already deleted or not found, skipping."
+          fi
