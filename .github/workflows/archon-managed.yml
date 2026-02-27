@@ -1,0 +1,53 @@
+name: archon-managed
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number'
+        required: true
+      comment_id:
+        description: 'Comment ID'
+        required: false
+      model:
+        description: 'AI Model'
+        required: true
+      archon_token:
+        description: 'SaaS Token'
+        required: false
+
+jobs:
+  archon:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Archon Agent
+        uses: vediyappanm/pro-gitops/github@main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ARCHON_SaaS_TOKEN: ${{ github.event.inputs.archon_token }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+        with:
+          model: ${{ github.event.inputs.model }}
+
+      - name: Self Cleanup
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+        run: |
+          git config --global user.name "archon-pro[bot]"
+          git config --global user.email "archon-pro[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${REPO}"
+          rm -f .github/workflows/archon-managed.yml
+          git add .github/workflows/archon-managed.yml
+          git diff --cached --quiet && echo "Nothing to commit, skipping" || git commit -m "chore: cleanup temporary archon runner [skip ci]"
+          git push origin "${REF}" || echo "Warning: push failed but workflow run is done"
